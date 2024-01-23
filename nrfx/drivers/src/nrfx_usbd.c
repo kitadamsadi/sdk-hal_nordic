@@ -1620,6 +1620,19 @@ static const nrfx_irq_handler_t m_isr[] =
     [USBD_INTEN_EPDATA_Pos     ] = ev_epdata_handler
 };
 
+
+//ADI: Support hooking the SOF event with low latency
+typedef void (* sof_irq_hook_t)(uint16_t);
+
+sof_irq_hook_t gSOF_ISR_HookPtr = NULL;
+
+sof_irq_hook_t setSOFIRQHook(sof_irq_hook_t hookFunc)
+{
+sof_irq_hook_t old = gSOF_ISR_HookPtr;
+gSOF_ISR_HookPtr = hookFunc;
+return old;
+}
+
 /**
  * @name Interrupt handlers
  *
@@ -1642,6 +1655,12 @@ void nrfx_usbd_irq_handler(void)
         }
         to_process &= ~(1UL << event_nr);
     }
+
+    //ADI: Support hooking the SOF event with low latency
+    if(active & NRF_USBD_INT_SOF_MASK && gSOF_ISR_HookPtr)
+      {
+      (*gSOF_ISR_HookPtr)((uint16_t)nrf_usbd_framecntr_get(NRF_USBD));
+      }
 
     /* Process the active interrupts */
     bool setup_active = 0 != (active & NRF_USBD_INT_EP0SETUP_MASK);
